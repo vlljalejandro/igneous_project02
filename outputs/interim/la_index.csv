@@ -1,0 +1,86 @@
+label,run,name,is_sample,material,role
+001N612,1,N612,False,N612,NIST — machine check
+002N612,2,N612,False,N612,NIST — machine check
+003N612,3,N612,False,N612,NIST — machine check
+004KL2,4,KL2,False,KL2,calibration std (KL2)
+005KL2,5,KL2,False,KL2,calibration std (KL2)
+006KL2,6,KL2,False,KL2,calibration std (KL2)
+007BM90,7,BM90,False,BM90,control std
+008BM90,8,BM90,False,BM90,control std
+009GOR132,9,GOR132,False,GOR132,control std
+010GOR132,10,GOR132,False,GOR132,control std
+011GOR128,11,GOR128,False,GOR128,control std
+012GOR128,12,GOR128,False,GOR128,control std
+013BCR2G,13,BCR2G,False,BCR2G,control std
+014BCR2G,14,BCR2G,False,BCR2G,control std
+015MC22-1-16,15,MC22-1-16,True,MC22-1-16,sample
+016MC22-1-20,16,MC22-1-20,True,MC22-1-20,sample
+017MC22-1-21,17,MC22-1-21,True,MC22-1-21,sample
+018MC22-1-26,18,MC22-1-26,True,MC22-1-26,sample
+019MC22-1-26B,19,MC22-1-26B,True,MC22-1-26,sample
+020MC22-1-27,20,MC22-1-27,True,MC22-1-27,sample
+021MC22-2-1,21,MC22-2-1,True,MC22-2-1,sample
+022MC22-2-5,22,MC22-2-5,True,MC22-2-5,sample
+023MC22-2-8,23,MC22-2-8,True,MC22-2-8,sample
+024KL2,24,KL2,False,KL2,calibration std (KL2)
+025KL2,25,KL2,False,KL2,calibration std (KL2)
+026KL2,26,KL2,False,KL2,calibration std (KL2)
+027N612,27,N612,False,N612,NIST — machine check
+028BCR2G,28,BCR2G,False,BCR2G,control std
+029MC22-2-9,29,MC22-2-9,True,MC22-2-9,sample
+030MC22-2-23,30,MC22-2-23,True,MC22-2-23,sample
+031MC22-2-35,31,MC22-2-35,True,MC22-2-35,sample
+032MC22-2-32,32,MC22-2-32,True,MC22-2-32,sample
+034MC22-2-30,34,MC22-2-30,True,MC22-2-30,sample
+035MC22-2-24,35,MC22-2-24,True,MC22-2-24,sample
+036MC22-2-27,36,MC22-2-27,True,MC22-2-27,sample
+037MC22-2-28,37,MC22-2-28,True,MC22-2-28,sample
+038MC22-2-29,38,MC22-2-29,True,MC22-2-29,sample
+039MC22-2-29B,39,MC22-2-29B,True,MC22-2-29,sample
+040MC22-2-31,40,MC22-2-31,True,MC22-2-31,sample
+041MC22-2-40,41,MC22-2-40,True,MC22-2-40,sample
+042KL2,42,KL2,False,KL2,calibration std (KL2)
+043GOR132,43,GOR132,False,GOR132,control std
+044KL2,44,KL2,False,KL2,calibration std (KL2)
+045KL2,45,KL2,False,KL2,calibration std (KL2)
+046KL2,46,KL2,False,KL2,calibration std (KL2)
+047GOR128,47,GOR128,False,GOR128,control std
+048MC59-1-2A,48,MC59-1-2A,True,MC59-1-2,sample
+049MC59-2-1A,49,MC59-2-1A,True,MC59-2-1,sample
+050MC59-2-6A,50,MC59-2-6A,True,MC59-2-6,sample
+051MC59-9-1A,51,MC59-9-1A,True,MC59-9-1,sample
+052MC59-9-1B,52,MC59-9-1B,True,MC59-9-1,sample
+053MC59-9-1B2,53,MC59-9-1B2,True,MC59-9-1B2,sample
+054MC59-2-8A,54,MC59-2-8A,True,MC59-2-8,sample
+055MC59-1-3A,55,MC59-1-3A,True,MC59-1-3,sample
+056MC59-1-3B,56,MC59-1-3B,True,MC59-1-3,sample
+057MC59-1-7B,57,MC59-1-7B,True,MC59-1-7,sample
+058MC82-6,58,MC82-6,True,MC82-6,sample
+059MC82-11,59,MC82-11,True,MC82-11,sample
+060MC82-29,60,MC82-29,True,MC82-29,sample
+061MC82-35,61,MC82-35,True,MC82-35,sample
+062MC82-37,62,MC82-37,True,MC82-37,sample
+063MC82-39,63,MC82-39,True,MC82-39,sample
+064KL2,64,KL2,False,KL2,calibration std (KL2)
+065KL2,65,KL2,False,KL2,calibration std (KL2)
+066KL2,66,KL2,False,KL2,calibration std (KL2)
+067KL2,67,KL2,False,KL2,calibration std (KL2)
+068GOR132,68,GOR132,False,GOR132,control std
+069GOR128,69,GOR128,False,GOR128,control std
+070BCR2G,70,BCR2G,False,BCR2G,control std
+071MC82-12,71,MC82-12,True,MC82-12,sample
+072MC82-12B,72,MC82-12B,True,MC82-12,sample
+073MC82-19,73,MC82-19,True,MC82-19,sample
+074MC82-21,74,MC82-21,True,MC82-21,sample
+075MC82-28,75,MC82-28,True,MC82-28,sample
+076MC82-32,76,MC82-32,True,MC82-32,sample
+077MC82-40,77,MC82-40,True,MC82-40,sample
+078MC82-5,78,MC82-5,True,MC82-5,sample
+079MC99U-7,79,MC99U-7,True,MC99U-7,sample
+080MC99U-10,80,MC99U-10,True,MC99U-10,sample
+081KL2,81,KL2,False,KL2,calibration std (KL2)
+082KL2,82,KL2,False,KL2,calibration std (KL2)
+083KL2,83,KL2,False,KL2,calibration std (KL2)
+084N612,84,N612,False,N612,NIST — machine check
+085N612,85,N612,False,N612,NIST — machine check
+086N612,86,N612,False,N612,NIST — machine check
