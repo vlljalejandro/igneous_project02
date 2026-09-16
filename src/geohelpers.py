@@ -84,3 +84,76 @@ def parse_id(s):
     """'UnkA-C21MI_9_3' -> ('UnkA-C21MI_9', 3); last number = measurement/spot."""
     m = re.match(r"^(.*)_(\d+)$", s.strip())
     return (m.group(1), int(m.group(2))) if m else (s.strip(), np.nan)
+
+
+# ---------- statistics shared by 01 / 02 ----------
+
+Q_CRIT = {          # Dean & Dixon Q, one gap, from the lecture tables
+    90: {3:.941, 4:.765, 5:.642, 6:.560, 7:.507, 8:.468, 9:.437, 10:.412,
+         11:.392, 12:.376, 13:.361, 14:.349, 15:.338, 16:.329, 17:.320, 18:.313},
+    95: {3:.970, 4:.829, 5:.710, 6:.625, 7:.568, 8:.526, 9:.493, 10:.466,
+         11:.444, 12:.426, 13:.410, 14:.396, 15:.384, 16:.374, 17:.365, 18:.356}}
+
+def q_test(values, conf=90):
+    """Dean-Dixon Q on the min and max of a replicate set.
+    Returns (index_to_reject | None, Q_exp, Q_crit). Never rejects more than one point."""
+    v = pd.Series(values).dropna().sort_values()
+    n = len(v)
+    if n < 3 or n > max(Q_CRIT[conf]) or v.iloc[-1] == v.iloc[0]:
+        return None, np.nan, np.nan
+    rng = v.iloc[-1] - v.iloc[0]
+    q_lo = (v.iloc[1] - v.iloc[0]) / rng
+    q_hi = (v.iloc[-1] - v.iloc[-2]) / rng
+    q_exp, idx = (q_hi, v.index[-1]) if q_hi >= q_lo else (q_lo, v.index[0])
+    qc = Q_CRIT[conf][n]
+    return (idx if q_exp > qc else None), q_exp, qc
+
+def summarize(df, cols, by):
+    """n, mean, 2SD, 2RSD%, 2SE per group per oxide, long format."""
+    g = df.groupby(by)[cols]
+    n, mu, sd = g.count(), g.mean(), g.std()
+    out = pd.concat({"n": n, "mean": mu, "2SD": 2*sd, "2RSD%": 200*sd/mu,
+                     "2SE": 2*sd/np.sqrt(n)}, axis=1).stack(future_stack=True)
+    out.index.names = list(np.atleast_1d(by)) + ["oxide"]
+    return out.reset_index()
+
+
+def load_ref_majors(path, sheet="major elements"):
+    """Standards.xlsx 'major elements' -> wt% oxide table indexed by standard name.
+    The sheet reports sulphur as element S; converted to SO3 (x 2.4972)."""
+    r = pd.read_excel(path, sheet)
+    r.columns = [str(c).strip() for c in r.columns]
+    r = r.set_index(r.columns[0])
+    r.index = r.index.astype(str).str.strip()
+    r = r[r.index.str.startswith("Std")].apply(pd.to_numeric, errors="coerce")
+    if "S" in r.columns:
+        r["SO3"] = r["S"] * 2.4972
+    r.index = r.index.str.replace("^Std ", "", regex=True)
+    return r
+
+
+# ---------- olivine-specific (02) ----------
+
+OXIDE_MW = {"SiO2": 60.084, "TiO2": 79.866, "Al2O3": 101.961, "FeO": 71.844, "MnO": 70.937,
+            "MgO": 40.304, "CaO": 56.077, "NiO": 74.692, "Cr2O3": 151.990, "Na2O": 61.979,
+            "K2O": 94.196, "P2O5": 141.945}
+
+def load_ref_olivine(path, sheet="major elements"):
+    """The SC_Olivine reference row of Standards.xlsx, which sits in a second table
+    further down the sheet with its own header row. Returns a wt% oxide Series."""
+    raw = pd.read_excel(path, sheet, header=None)
+    i = raw.index[raw[0].astype(str).str.strip().str.lower() == "sc_olivine"][0]
+    hdr = raw.loc[i - 1].astype(str).str.strip()
+    s = pd.Series(raw.loc[i].values, index=hdr).apply(pd.to_numeric, errors="coerce")
+    return s[[c for c in s.index if c in OXIDE_MW]].dropna()
+
+def cation_ratio(df, si="SiO2", m=("MgO", "FeO", "MnO", "CaO", "NiO")):
+    """Divalent cations per Si. Must be 2.000 for stoichiometric olivine, whatever the Fo.
+    Independent of any uniform scale error on the analysis, since it is a ratio."""
+    M = sum(df[o] / OXIDE_MW[o] for o in m if o in df)
+    return M / (df[si] / OXIDE_MW["SiO2"])
+
+def forsterite(df):
+    """Fo = 100 Mg/(Mg+Fe), mol%. For olivine this equals Mg# (all Fe as Fe2+)."""
+    mg, fe = df.MgO / OXIDE_MW["MgO"], df.FeO / OXIDE_MW["FeO"]
+    return 100 * mg / (mg + fe)
