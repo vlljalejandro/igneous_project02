@@ -157,3 +157,39 @@ def forsterite(df):
     """Fo = 100 Mg/(Mg+Fe), mol%. For olivine this equals Mg# (all Fe as Fe2+)."""
     mg, fe = df.MgO / OXIDE_MW["MgO"], df.FeO / OXIDE_MW["FeO"]
     return 100 * mg / (mg + fe)
+
+
+# ---------- LA-ICP-MS (03) ----------
+
+OXIDE_FROM_ISOTOPE = {"Na23": "Na2O", "Mg24": "MgO", "Al27": "Al2O3", "Si29": "SiO2",
+                      "P31": "P2O5", "K39": "K2O", "Ca43": "CaO", "Ti47": "TiO2",
+                      "Mn55": "MnO", "Fe57": "FeO", "Cr52": "Cr2O3", "Ni60": "NiO"}
+
+_CATIONS_PER_OXIDE = {"Na2O": 2, "Al2O3": 2, "P2O5": 2, "K2O": 2, "Cr2O3": 2}
+_ATOMIC_MW = {"Na2O": 22.990, "MgO": 24.305, "Al2O3": 26.982, "SiO2": 28.086, "P2O5": 30.974,
+              "K2O": 39.098, "CaO": 40.078, "TiO2": 47.867, "MnO": 54.938, "FeO": 55.845,
+              "Cr2O3": 51.996, "NiO": 58.693}
+
+def ppm_to_oxide(df):
+    """Element ppm (GLITTER isotope columns) -> oxide wt%. Column names become oxides."""
+    out = {}
+    for iso, ox in OXIDE_FROM_ISOTOPE.items():
+        if iso in df:
+            f = OXIDE_MW[ox] / (_CATIONS_PER_OXIDE.get(ox, 1) * _ATOMIC_MW[ox])
+            out[ox] = df[iso] * f / 1e4
+    return pd.DataFrame(out, index=df.index)
+
+def load_ref_la(path, sheet="Trace elements LA sorted"):
+    """The 'Trace elements LA sorted' sheet -> reference values in ppm, elements as rows,
+    reference materials as columns. Uncertainty rows are skipped; names are shortened to
+    match the analysis labels in the GLITTER export (KL2-G -> KL2, BM90/21-G -> BM90)."""
+    raw = pd.read_excel(path, sheet, header=None)
+    els = [str(v) for v in raw.iloc[0, 1:42]]
+    rename = {"ATHO-G": "ATHO", "BM90/21-G": "BM90", "GOR128-G": "GOR128",
+              "GOR132-G": "GOR132", "KL2-G": "KL2", "ML3B-G": "ML3B",
+              "StHs6/80-G": "StHs6", "T1-G": "T1", "BCR2-G": "BCR2G"}
+    cols = {}
+    for i, name in enumerate(raw[0]):
+        if str(name).strip() in rename:
+            cols[rename[str(name).strip()]] = pd.to_numeric(raw.iloc[i, 1:42], errors="coerce").values
+    return pd.DataFrame(cols, index=els)
