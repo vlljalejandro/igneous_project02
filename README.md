@@ -1,114 +1,134 @@
-# Project: Igneous Geochemistry — Exercise Data Processing (EPMA + LA-ICP-MS)
+# Igneous Geochemistry: exercise data processing (Set 4)
 
-## Context
-KAUST Igneous Geochemistry course (F. van der Zwan). **Set 4 — Paul & Alejandro V**
-(paired work; agree early who drafts which report section and keep one shared notebook set).
-Deliverable: the "Exercise data processing written reports — 20%" report, due Thu 10/08.
-Two EPMA datasets and one LA-ICP-MS dataset, raw instrument output → publication-ready
-tables and figures + a 5½-page report.
+Processing of two electron microprobe (EPMA) sessions, basaltic glasses and olivines, and one LA-ICP-MS session of melt inclusions, from raw instrument exports to corrected, quality-checked data, figures and paper-style tables.
 
-## Data — everything in `data/`
+KAUST Igneous Geochemistry course (F. van der Zwan), data processing exercise, Set 4 (Paul & Alejandro V).
+
+## Repository layout
+
 ```
-data/
-  Information regarding your files.docx  <- READ FIRST: sample list, which analyses are
-                                            standards vs unknowns, which set is Set 4
-  Standards.xlsx                         <- certified/reference values (GeoReM-style)
-  bgls_20122016_all.txt                  EPMA #1 — basaltic glasses, session 20/12/2016
-  bgls_20122016_oxide.txt                  _all   = counts, net cps, SD%, detection limits
-  bgls_20122016_std-cnd.txt                _oxide = oxide wt% + totals
-  ol_01032017_all.txt                    EPMA #2 — olivines, session 01/03/2017
-  ol_01032017_oxide.txt                    _mole  = cation/mole proportions
-  ol_01032017_mole.txt                     _ratios= e.g. Fo, Mg#
-  ol_01032017_ratios.txt                   _std-cnd = standards + analytical conditions
-  ol_01032017_std-cnd.txt                            (kV, nA, beam dia, count times)
-  170919s_9_global_tephra 1_Froukje2.csv LA-ICP-MS — GLITTER-style export, 19/09/2017
+igneous_project02/
+├── data/                      raw instrument files (read only, never modified)
+├── src/geohelpers.py          file readers and reference values shared by the notebooks
+├── 01_olivine.ipynb           EPMA olivine, session 01/03/2017
+├── 02_glass.ipynb             EPMA basaltic glasses, session 20/12/2016
+├── 03_laicpms.ipynb           LA-ICP-MS melt inclusions, session 19/09/2017
+├── 04_figures_tables.ipynb    figures for the data section and paper-style tables
+├── outputs/                   Excel files written by the notebooks
+└── figures/                   PNG figures (300 dpi): olivine/, glass/, laicpms/, report/
 ```
-File-content assumptions above are inferred from filenames — verify against the .docx in
-notebook 00 and correct this file if wrong. Confirm in the .docx that these three files
-are in fact Set 4's; if the sets are split differently, fix the list before processing.
-`*_std-cnd.txt` is the primary source for the report's methodology section; do not
-paraphrase conditions from memory.
 
-## Rules
-- Never modify files in `data/`. Outputs go to `outputs/` and `figures/`.
-- Hardcoded paths in a config cell at the top of each notebook. No argparse, no CLI.
-- Prefer short, direct pandas/numpy. Factor into `src/geohelpers.py` only if used by ≥2
-  notebooks (candidates: standards loader, Q-test, drift fit, 2SD/2SE).
-- Every filtering or correction decision gets a one-line justification in a markdown cell —
-  the methodology section is built from these, and "WHY" is explicitly graded.
-- Figures: matplotlib, one plot per figure, PNG 300 dpi + kept inline. Error bars are 2SE
-  unless stated. Units (wt% vs ppm) on every axis.
-- Data below detection limit: flag, never silently drop or set to zero.
+## Requirements
 
-## Notebook sequence
-**00_inspect.ipynb** — Open every file raw (`head`, no parser). Determine delimiter, header
-depth, comment/sample-ID column, encoding. JEOL exports often have multi-line or fixed-width
-headers; the filename with a space needs quoting/`Path`. Write one loader per file type,
-confirm row counts against the .docx, save tidy dataframes to `outputs/interim/`. Nothing
-else happens here.
+Python 3 with pandas, numpy, matplotlib, openpyxl and Jupyter. Tested with Python 3.12, pandas 3.0, numpy 2.4, matplotlib 3.10 and openpyxl 3.1.
 
-**01_epma_glass.ipynb** and **02_epma_olivine.ipynb** — same skeleton:
-1. Split into calibration standards, control standards run as unknowns (e.g. VG2, VGA99,
-   San Carlos Ol, KL2), and samples, using the Comment/Sample-ID field.
-2. Precision: per standard per oxide → mean, SD, 2SD, 2RSD%, n.
-3. Accuracy: deviation of mean from certified value in `Standards.xlsx` (absolute and %).
-   Flag any oxide where |accuracy error| > precision — the problem criterion from the lecture.
-4. Drift: plot each standard oxide vs analysis order. If a trend exists, derive a correction
-   factor (certified / measured mean) for the session or for batches between standard
-   brackets, apply to samples, record the factors.
-5. Filter samples: totals outside 98–102% (state whether volatiles or oxidation state could
-   legitimately explain low totals); element-specific contamination (olivine analyses with
-   anomalous Al₂O₃/CaO/K₂O = beam overlap onto glass or inclusions; glass analyses with Ol
-   contamination). Report how many points removed and why.
-6. Outliers within a sample's replicate spots: Q-test (Q_exp = gap/range, lecture tables)
-   before exclusion. Never drop a point just because it looks odd.
-7. Averages: minimum 3 points; report n, mean, 2SD, 2SE per sample. Check for two
-   populations (different glass chips, zoned olivine) rather than averaging across them.
-8. Compare low-concentration elements (Cl, P, Ni, Cr) to detection limits in `_all`.
-9. Olivine only: recompute Fo and Mg# from the oxides rather than trusting `_ratios`, and
-   confirm they agree.
+```
+pip install pandas numpy matplotlib openpyxl jupyter
+```
 
-**03_laicpms.ipynb**
-1. Identify calibration standard (likely NIST SRM 610/612), secondary/control standards
-   (KL2, ATHO, BCR2G, GOR128-G, GOR132-G, BM90 — confirm from the .docx), and unknowns.
-2. Confirm which element is the internal standard (constant within a material, e.g. Ca43 or
-   Si29) and which EPMA values it was normalized to.
-3. Per standard: mean, SD, %RSD, 2RSD, n → precision; deviation from reference → accuracy.
-   Produce the accuracy/precision table for every reported element.
-4. Drift: k = reference/measured per standard analysis, plot vs analysis number, fit a line,
-   decide session-wide vs batch-wise correction, apply.
-5. Oxide/molecular interference where relevant — ⁴⁵Sc on olivine is partly ²⁹Si¹⁶O: get the
-   Si* oxide-production factor from a Si-only material (quartz) and correct. Check REE for
-   LREE-oxide overlaps.
-6. Decide element by element what is reportable. 2RSD > ~20% or accuracy worse than ~15% →
-   exclude or report with an explicit caveat. Justify in writing.
-7. Optionally normalize majors to 100% and compare against EPMA for the same samples as an
-   independent consistency check.
+## How to run
 
-**04_figures_and_tables.ipynb** — final figures and the paper-style table.
+Start Jupyter in the repository root. Every path is relative to the root and set in the config cell at the top of each notebook (no command-line arguments). Run the notebooks in order:
 
-## Figures (pick the subset the report can carry)
-- Standard time series with certified value ± 2SD band (drift evidence)
-- Accuracy vs precision per element, per technique
-- Histogram of analytical totals with the 98–102% window marked
-- Harker diagrams (MgO vs major oxides) for the glasses
-- Fo vs NiO / CaO / MnO for the olivines
-- Primitive-mantle-normalized multi-element and chondrite-normalized REE patterns
-- EPMA vs LA-ICP-MS 1:1 plot for shared elements
+1. `01_olivine.ipynb`
+2. `02_glass.ipynb`
+3. `03_laicpms.ipynb`
+4. `04_figures_tables.ipynb` (reads only the outputs of 01 to 03)
 
-## Report (5½ pages)
-| Section | Pages | Content |
+Notebooks 01 to 03 are independent of each other.
+
+## Input data
+
+| File | Content | Used by |
 |---|---|---|
-| Introduction | ½ | What the samples are, what the analytical question is |
-| Detailed methodology | 2 | Every processing step **and why**, with example figures |
-| Assessment of data quality | 1 | Precision, accuracy, detection limits, what is and isn't reportable |
-| Methodology for manuscript | ½ | The same work as a journal methods paragraph: instruments, conditions, standards, their reproducibility |
-| Short presentation of data | 1 | The geochemistry itself, 2–3 figures |
-| Conclusion | ½ | What was learned, interesting features of the data |
+| `ol_01032017_oxide.txt` | olivine oxides (wt%) per analysis | 01 |
+| `ol_01032017_ratios.txt` | Fo and Fa (mol%) per analysis | 01 |
+| `ol_01032017_all.txt` | full record per analysis; detection limits | 01 |
+| `ol_01032017_std-cnd.txt` | analytical conditions, calibration standards and their values | 01, methods |
+| `ol_01032017_mole.txt` | cation proportions | not used |
+| `bgls_20122016_oxide.txt` | glass oxides (wt%) per analysis | 02 |
+| `bgls_20122016_all.txt` | full record per analysis; detection limits | 02 |
+| `bgls_20122016_std-cnd.txt` | analytical conditions, calibration standards and their values | 02, methods |
+| `170919s_9_global_tephra 1_Froukje2.csv` | GLITTER export: concentrations, 1σ errors, detection limits | 03 |
+| `Standards.xlsx` | reference values: sheet *major elements* (EPMA), sheet *Trace elements LA sorted* (LA-ICP-MS) | 01, 02, 03 |
+| `Information regarding your files.docx` | sample list, naming rules, LA measurement schedule | read by hand |
 
-Optional appendix: Excel table formatted as for a paper — sample, n, mean ± 2SE, with
-standards and reference values in the same table.
+## Processing
 
-## Working style
-Concise and direct. Minimal, targeted code over architecture. Ask before inventing data
-semantics — if a column's meaning is ambiguous, check the .docx or flag it rather than guess.
+### EPMA: 01 olivine and 02 glass (steps 1 to 10)
+
+1. Join the oxide table and, for olivine, the Fo/Fa table on the analysis number.
+2. Put the Comment column first, then the oxides.
+3. Plot every standard element against analysis number and remove obvious outliers by eye.
+4. Compute the mean, SD and correction factor CF = mean / reference. Every analysis is divided by its CF and the totals are recomputed.
+   - Reference values come from `Standards.xlsx`, replaced by the more precise `_std-cnd` values for each calibration standard.
+   - Glass: each oxide is corrected with its own calibration standard (VGA99; Scapolite for SO₃ and Cl; KE3 for F). MnO uses VG-2, because its calibration standard (rhodonite) was not measured in the session.
+5. Flag correction factors outside 0.95 to 1.05.
+6. Estimate accuracy from held-out standards: the CF is computed from part of each standard bracket and tested on the rest. For glass, VG-2 is also used, since it is not a calibration standard.
+7. Olivine only: recompute Fo from MgO and FeO and compare it with the instrument's `Fo+M`.
+8. Compute precision (2SD, 2RSD) and accuracy of the corrected standards.
+9. Screen the samples:
+   - Totals outside 98 to 102 wt% are flagged.
+   - Obviously wrong analyses are excluded from the figures.
+   - Values below the detection limit of their own analysis are flagged, never removed.
+10. Save the final corrected data and sample or grain means (n, mean, 2SD).
+
+### LA-ICP-MS: 03
+
+1. Transpose the GLITTER export and assign roles from the measurement schedule in the .docx:
+   - KL2 bracketing triplets: calibration.
+   - KL2 between brackets, BCR-2G, GOR128-G, GOR132-G and BM90/21-G: controls.
+   - NIST 612: not used.
+2. Keep the concentrations not filtered for the detection limit; flag values below each analysis's own detection limit (BDL).
+3. Remove obvious outliers among the standards. Average the KL2 calibration analyses per bracket and fit a line against run number.
+4. Divide every analysis by CF(run) = fitted KL2(run) / KL2 reference. Run number is used as time. Ca43, the internal standard, is not corrected.
+5. For every standard type, report the average, deviation from the reference, SD, SD %, 2SD and 2RSD %.
+6. (Step 5b) Exclude BDL values. Flag an element when its 2RSD on KL2 exceeds 20 % or its deviation on BCR-2G exceeds 15 %.
+7. (Step 6) Normalise the REE to CI chondrite and the multi-element pattern to primitive mantle (Sun & McDonough, 1989). Flag inclusions with Pb/Pb* above 5 as probable Pb contamination.
+
+### Figures and tables: 04
+
+- Glass Harker diagram (MgO against CaO).
+- Olivine Fo against NiO, with the Fo that would be in equilibrium with the C21 glass.
+- Paper-style tables: mean ± 2SD with n per sample, grain or inclusion, and the standards next to their reference values.
+
+## Outputs
+
+| File | Content |
+|---|---|
+| `outputs/olivine_step4_standards.xlsx` | SC-Olivine analyses, correction factors, all analyses raw and corrected |
+| `outputs/olivine_final.xlsx` | corrected samples with flags, grain means, standard QC, hold-out accuracy, detection limits |
+| `outputs/glass_step4_standards.xlsx` | standard analyses and statistics, correction factors, all analyses raw and corrected |
+| `outputs/glass_final.xlsx` | corrected samples with flags, sample means, standard QC, hold-out and VG-2 accuracy, detection limits |
+| `outputs/laicpms_standards_QC.xlsx` | accuracy and precision per standard type, element flags, KL2 trend |
+| `outputs/laicpms_final.xlsx` | corrected analyses with flags, inclusion means, element flags, run list |
+| `outputs/paper_tables.xlsx` | glass, olivine and melt inclusion tables formatted for a paper |
+
+## Conventions
+
+- CF = mean / reference; corrected value = raw value / CF.
+- Uncertainties are 2SD (2σ) unless stated. Precision is 2RSD in %; accuracy is the deviation from the reference value in %.
+- The analysis or run number is used as time; timestamps are not used.
+- Flagging never deletes data: excluded analyses keep their row and a note.
+- Files in `data/` are never modified.
+
+## Changing a decision
+
+Every judgement call is a short, commented variable in the notebook that applies it, with the reason in the markdown cell above it.
+
+| Decision | Where |
+|---|---|
+| Outliers removed from the standards | `DROP` (01, 02); `DROP_RUN`, `DROP_EL` (03) |
+| Sample analyses excluded from the figures | `BAD` (01, 02); `BAD_EL` (02) |
+| Standard used for the glass MnO correction | `CF_STD["MnO"]` (02, step 4) |
+| KL2 analyses used for calibration | `KL2_CAL` (03, config) |
+| Element reportability thresholds | 03, step 5b |
+| Pb contamination threshold | 03, step 6 |
+| Kd and Fe²⁺/ΣFe for the olivine-melt equilibrium band | `KD`, `FE2` (04, config) |
+
+## References
+
+- Jochum, K. P. et al. (2005). GeoReM: a new geochemical database for reference materials and isotopic standards. *Geostandards and Geoanalytical Research* 29, 333–338. (reference values in `Standards.xlsx`)
+- Roeder, P. L. & Emslie, R. F. (1970). Olivine-liquid equilibrium. *Contributions to Mineralogy and Petrology* 29, 275–289. (olivine-melt Fe-Mg Kd)
+- Sun, S.-s. & McDonough, W. F. (1989). Chemical and isotopic systematics of oceanic basalts: implications for mantle composition and processes. *Geological Society, London, Special Publications* 42, 313–345. (CI chondrite and primitive mantle values)
+- Williams, M. J. et al. (2020). pyrolite: Python for geochemistry. *Journal of Open Source Software* 5(50), 2314. (source of the Sun & McDonough values in `src/geohelpers.py`)

@@ -1,195 +1,110 @@
-import re, numpy as np, pandas as pd
-from pathlib import Path
+"""Readers for the JEOL EPMA exports, shared by 01_olivine and 02_glass."""
+import numpy as np, pandas as pd
 
-def load_jeol_table(path):
-    """_oxide / _mole / _ratios: tab-separated, 1 header row, stats footer."""
-    df = pd.read_csv(path, sep="\t", skiprows=3, engine="python", quoting=3)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
-    df["No."] = df["No."].astype(str).str.strip()
-    df = df[df["No."].str.fullmatch(r"\d+")].copy()      # drops Minimum/Maximum/Average/Sigma/No. of data footer
-    df["No."] = df["No."].astype(int)
-    df["Comment"] = df["Comment"].astype(str).str.strip()
-    for c in df.columns.drop(["No.","Comment"]):
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df.reset_index(drop=True)
+# element (ppm) -> oxide (wt%) conversion, for detection limits
+OXF = {"Si": ("SiO2", 2.1393), "Ti": ("TiO2", 1.6681), "Al": ("Al2O3", 1.8895), "Cr": ("Cr2O3", 1.4615),
+       "Fe": ("FeO", 1.2865), "Mn": ("MnO", 1.2912), "Mg": ("MgO", 1.6583), "Ca": ("CaO", 1.3992),
+       "Ni": ("NiO", 1.2725), "Na": ("Na2O", 1.3480), "K": ("K2O", 1.2046), "P": ("P2O5", 2.2914),
+       "S": ("SO3", 2.4972), "Cl": ("Cl", 1.0), "F": ("F", 1.0)}
 
-BLK = re.compile(r"Unknown Specimen No\.\s+(\d+)")
-def load_jeol_all(path):
-    """_all: per-analysis blocks -> (meta df, long df of net cps / SD% / DL)."""
-    txt = Path(path).read_text().replace("\r","")
-    blocks = re.split(r"(?=Unknown Specimen No\.)", txt)[1:]
-    meta, rows = [], []
-    for b in blocks:
-        no  = int(BLK.search(b).group(1))
-        m   = {"No.": no,
-               "Comment": re.search(r"Comment\s*:\s*(.*)", b).group(1).strip(),
-               "date":    re.search(r"Dated on (.*)", b).group(1).strip(),
-               "kV":   float(re.search(r"Acc\. Voltage :\s*([\d.]+)", b).group(1)),
-               "dia":  float(re.search(r"Probe Dia\. :\s*(\d+)", b).group(1)),
-               "curr_A": float(re.search(r"Curr\.\(A\) :\s*([\dE.+-]+)", b).group(1))}
-        s = re.search(r"Stage\s*:\s*X=\s*([\d.-]+)\s*Y=\s*([\d.-]+)\s*Z=\s*([\d.-]+)", b)
-        m.update(zip(("X","Y","Z"), map(float, s.groups())))
-        meta.append(m)
-        tbl = b.split("D.L.(ppm)")[1].split("\n\n")[0]
-        for ln in tbl.strip().split("\n"):
-            p = ln.split()
-            if len(p) >= 7 and p[0].isdigit():
-                rows.append({"No.": no, "element": p[1], "peak_mm": float(p[2]),
-                             "net_cps": float(p[3]), "bg_minus": float(p[4]),
-                             "bg_plus": float(p[5]), "sd_pct": float(p[6].rstrip("?")),
-                             "dl_ppm": float(p[-1].rstrip("?")), "flagged": "?" in ln})
-    meta = pd.DataFrame(meta)
-    meta["datetime"] = pd.to_datetime(meta["date"], format="%b %d %H:%M %Y")
-    return meta, pd.DataFrame(rows)
 
-def load_std_cnd(path):
-    """_std-cnd: calibration standard per oxide + count times + WDS setup."""
-    txt = Path(path).read_text().replace("\r","")
-    std = pd.DataFrame(
-        [l.split("\t")[1:4] for l in txt.split("Standard Data")[1].split("Standard Intensity")[0]
-         .strip().split("\n")[1:] if l.count("\t") >= 3],
-        columns=["oxide","standard","mass_pct"])
-    std = std.apply(lambda s: s.str.strip())
-    std["mass_pct"] = std["mass_pct"].astype(float)
-    cnd = pd.DataFrame(
-        [l.split("\t")[1:5] for l in txt.split("Element\tPeak\tBack\tPksk")[1]
-         .split("\n \n")[0].strip().split("\n") if l.count("\t") >= 4],
-        columns=["element","peak_s","bg_s","_"]).drop(columns="_")
-    cnd = cnd.apply(lambda s: s.str.strip())
-    cnd = cnd[cnd["peak_s"].str.match(r"[\d.]+$")].reset_index(drop=True)
-    cnd[["peak_s","bg_s"]] = cnd[["peak_s","bg_s"]].astype(float)
-    return std, cnd
+def read_jeol(path):
+    """JEOL summary table (_oxide, _ratios): tab-separated, 3 title lines, statistics footer -> one row per analysis."""
+    d = pd.read_csv(path, sep="\t", skiprows=3, skipinitialspace=True, encoding="latin-1")
+    d.columns = [c.strip() for c in d.columns]
+    d = d[pd.to_numeric(d["No."], errors="coerce").notna()].copy()          # drops Minimum/Maximum/Average/Sigma rows
+    for c in d.columns.drop("Comment"):
+        d[c] = pd.to_numeric(d[c], errors="coerce")
+    d["No."], d["Comment"] = d["No."].astype(int), d["Comment"].str.strip()
+    return d.dropna(axis=1, how="all").reset_index(drop=True)
 
-def load_glitter(path):
-    """GLITTER export -> {block name: (values df, below-MDL mask df)}; rows=analyses."""
-    lines = Path(path).read_text().replace("\r","").split("\n")
-    starts = [i for i,l in enumerate(lines) if l.startswith("GLITTER!:")]
+
+def read_dl(path):
+    """Detection limits per analysis from a JEOL _all file, converted to oxide wt% -> rows = No., columns = oxide."""
+    rows, no, block = {}, None, False
+    for line in open(path, encoding="latin-1"):
+        if "UNK No." in line:
+            no = int(line.split(":")[1].split()[0])
+        elif line.lstrip().startswith("Element Peak"):
+            block = True
+        elif block and line.strip():
+            t = line.split()
+            ox, f = OXF[t[1]]
+            rows.setdefault(no, {})[ox] = float(t[-1]) * f / 1e4
+        else:
+            block = False
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis("No.")
+
+
+def read_cal(path):
+    """Calibration standard and assumed value per oxide ('Standard Data' block of a _std-cnd file)."""
+    rows, block = [], False
+    for line in open(path, encoding="latin-1"):
+        t = line.split()
+        if line.startswith("Standard Data"):
+            block = True
+        elif block and t and t[0].isdigit():
+            rows.append(dict(oxide=t[1], standard=t[2], value=float(t[3])))
+        elif block and rows:
+            break
+    return pd.DataFrame(rows)
+
+
+def read_ref(path, rows):
+    """Reference values from the 'major elements' sheet of Standards.xlsx.
+    rows: {name in the xlsx: name used in the session}. S is converted to SO3."""
+    xl = pd.read_excel(path, sheet_name="major elements", header=None).fillna("").astype(str).apply(lambda c: c.str.strip())
+    is_hdr = (xl == "SiO2").any(axis=1)                       # the sheet has several header rows
     out = {}
-    for i in starts:
-        name = lines[i].split("GLITTER!:")[1].strip().rstrip(".")
-        cols = lines[i+1].split(",")[1:]
-        cols = [c for c in cols if c]
-        body = []
-        for l in lines[i+2:]:
-            if not l.strip() or l.startswith("GLITTER!:"): break
-            body.append(l.split(","))
-        df = pd.DataFrame({r[0]: r[1:len(cols)+1] for r in body if r[0]}, index=cols)
-        bdl = df.apply(lambda s: s.astype(str).str.strip().str.startswith("<"))
-        val = df.apply(lambda s: pd.to_numeric(s.astype(str).str.lstrip("<"), errors="coerce"))
-        out[name] = (val, bdl)
-    return out
-
-def parse_id(s):
-    """'UnkA-C21MI_9_3' -> ('UnkA-C21MI_9', 3); last number = measurement/spot."""
-    m = re.match(r"^(.*)_(\d+)$", s.strip())
-    return (m.group(1), int(m.group(2))) if m else (s.strip(), np.nan)
+    for name, alias in rows.items():
+        r = xl.index[xl[0] == name][0]
+        hdr = xl.loc[is_hdr[:r].index[is_hdr[:r]][-1]]        # nearest header row above
+        s = pd.Series(xl.loc[r].values, index=hdr).drop(["Comment", "Total", ""], errors="ignore")
+        out[alias] = pd.to_numeric(s, errors="coerce")
+    ref = pd.DataFrame(out).T.rename_axis(columns=None)
+    if "S" in ref:
+        ref["SO3"] = ref.pop("S") * 2.4972
+    return ref
 
 
-# ---------- statistics shared by 01 / 02 ----------
-
-Q_CRIT = {          # Dean & Dixon Q, one gap, from the lecture tables
-    90: {3:.941, 4:.765, 5:.642, 6:.560, 7:.507, 8:.468, 9:.437, 10:.412,
-         11:.392, 12:.376, 13:.361, 14:.349, 15:.338, 16:.329, 17:.320, 18:.313},
-    95: {3:.970, 4:.829, 5:.710, 6:.625, 7:.568, 8:.526, 9:.493, 10:.466,
-         11:.444, 12:.426, 13:.410, 14:.396, 15:.384, 16:.374, 17:.365, 18:.356}}
-
-def q_test(values, conf=90):
-    """Dean-Dixon Q on the min and max of a replicate set.
-    Returns (index_to_reject | None, Q_exp, Q_crit). Never rejects more than one point."""
-    v = pd.Series(values).dropna().sort_values()
-    n = len(v)
-    if n < 3 or n > max(Q_CRIT[conf]) or v.iloc[-1] == v.iloc[0]:
-        return None, np.nan, np.nan
-    rng = v.iloc[-1] - v.iloc[0]
-    q_lo = (v.iloc[1] - v.iloc[0]) / rng
-    q_hi = (v.iloc[-1] - v.iloc[-2]) / rng
-    q_exp, idx = (q_hi, v.index[-1]) if q_hi >= q_lo else (q_lo, v.index[0])
-    qc = Q_CRIT[conf][n]
-    return (idx if q_exp > qc else None), q_exp, qc
-
-def summarize(df, cols, by):
-    """n, mean, 2SD, 2RSD%, 2SE per group per oxide, long format."""
+def mean_2sd(df, by, cols):
+    """n, mean and 2SD per group, columns: <oxide> and <oxide>_2SD."""
     g = df.groupby(by)[cols]
-    n, mu, sd = g.count(), g.mean(), g.std()
-    out = pd.concat({"n": n, "mean": mu, "2SD": 2*sd, "2RSD%": 200*sd/mu,
-                     "2SE": 2*sd/np.sqrt(n)}, axis=1).stack(future_stack=True)
-    out.index.names = list(np.atleast_1d(by)) + ["oxide"]
-    return out.reset_index()
+    return pd.concat([g.size().rename("n"), g.mean(), (2 * g.std()).add_suffix("_2SD")], axis=1)[
+        ["n"] + [c for ox in cols for c in (ox, f"{ox}_2SD")]]
 
 
-def load_ref_majors(path, sheet="major elements"):
-    """Standards.xlsx 'major elements' -> wt% oxide table indexed by standard name.
-    The sheet reports sulphur as element S; converted to SO3 (x 2.4972)."""
-    r = pd.read_excel(path, sheet)
-    r.columns = [str(c).strip() for c in r.columns]
-    r = r.set_index(r.columns[0])
-    r.index = r.index.astype(str).str.strip()
-    r = r[r.index.str.startswith("Std")].apply(pd.to_numeric, errors="coerce")
-    if "S" in r.columns:
-        r["SO3"] = r["S"] * 2.4972
-    r.index = r.index.str.replace("^Std ", "", regex=True)
-    return r
+# ---------------- LA-ICP-MS (GLITTER export) ----------------
+
+def read_glitter(path, block):
+    """One block of a GLITTER csv export, transposed: rows = analyses, columns = isotopes (Li7, ...).
+    block: start of the block title, e.g. 'Trace Element Concentrations, Not filtered for MDL'."""
+    import io
+    lines = open(path, encoding="latin-1").read().splitlines()
+    starts = [i for i, l in enumerate(lines) if l.startswith("GLITTER!:")]
+    i = next(i for i in starts if lines[i].startswith("GLITTER!: " + block))
+    j = next((k for k in starts if k > i), len(lines))
+    d = pd.read_csv(io.StringIO("\n".join(l for l in lines[i + 1:j] if l.strip())), index_col=0)
+    return d.apply(pd.to_numeric, errors="coerce").T.rename_axis(index="label", columns=None)
 
 
-# ---------- olivine-specific (02) ----------
-
-OXIDE_MW = {"SiO2": 60.084, "TiO2": 79.866, "Al2O3": 101.961, "FeO": 71.844, "MnO": 70.937,
-            "MgO": 40.304, "CaO": 56.077, "NiO": 74.692, "Cr2O3": 151.990, "Na2O": 61.979,
-            "K2O": 94.196, "P2O5": 141.945}
-
-def load_ref_olivine(path, sheet="major elements"):
-    """The SC_Olivine reference row of Standards.xlsx, which sits in a second table
-    further down the sheet with its own header row. Returns a wt% oxide Series."""
-    raw = pd.read_excel(path, sheet, header=None)
-    i = raw.index[raw[0].astype(str).str.strip().str.lower() == "sc_olivine"][0]
-    hdr = raw.loc[i - 1].astype(str).str.strip()
-    s = pd.Series(raw.loc[i].values, index=hdr).apply(pd.to_numeric, errors="coerce")
-    return s[[c for c in s.index if c in OXIDE_MW]].dropna()
-
-def cation_ratio(df, si="SiO2", m=("MgO", "FeO", "MnO", "CaO", "NiO")):
-    """Divalent cations per Si. Must be 2.000 for stoichiometric olivine, whatever the Fo.
-    Independent of any uniform scale error on the analysis, since it is a ratio."""
-    M = sum(df[o] / OXIDE_MW[o] for o in m if o in df)
-    return M / (df[si] / OXIDE_MW["SiO2"])
-
-def forsterite(df):
-    """Fo = 100 Mg/(Mg+Fe), mol%. For olivine this equals Mg# (all Fe as Fe2+)."""
-    mg, fe = df.MgO / OXIDE_MW["MgO"], df.FeO / OXIDE_MW["FeO"]
-    return 100 * mg / (mg + fe)
+def read_ref_la(path):
+    """GeoReM values (µg/g) and their 95 % uncertainty from the 'Trace elements LA sorted' sheet of Standards.xlsx
+    -> (values, uncertainty), rows = standard, columns = element symbol."""
+    x = pd.read_excel(path, sheet_name="Trace elements LA sorted", header=None)
+    cols = x.iloc[0, 1:].tolist()
+    stop = cols.index("H2O")                                         # trace elements end where the oxides start
+    rows = x.index[x[0].notna() & (x[0] != "uncertainty")]
+    val = pd.DataFrame(x.loc[rows, 1:stop].values, index=x.loc[rows, 0], columns=cols[:stop]).apply(pd.to_numeric, errors="coerce")
+    unc = pd.DataFrame(x.loc[rows + 1, 1:stop].values, index=x.loc[rows, 0], columns=cols[:stop]).apply(pd.to_numeric, errors="coerce")
+    return val.rename_axis(None), unc.rename_axis(None)
 
 
-# ---------- LA-ICP-MS (03) ----------
-
-OXIDE_FROM_ISOTOPE = {"Na23": "Na2O", "Mg24": "MgO", "Al27": "Al2O3", "Si29": "SiO2",
-                      "P31": "P2O5", "K39": "K2O", "Ca43": "CaO", "Ti47": "TiO2",
-                      "Mn55": "MnO", "Fe57": "FeO", "Cr52": "Cr2O3", "Ni60": "NiO"}
-
-_CATIONS_PER_OXIDE = {"Na2O": 2, "Al2O3": 2, "P2O5": 2, "K2O": 2, "Cr2O3": 2}
-_ATOMIC_MW = {"Na2O": 22.990, "MgO": 24.305, "Al2O3": 26.982, "SiO2": 28.086, "P2O5": 30.974,
-              "K2O": 39.098, "CaO": 40.078, "TiO2": 47.867, "MnO": 54.938, "FeO": 55.845,
-              "Cr2O3": 51.996, "NiO": 58.693}
-
-def ppm_to_oxide(df):
-    """Element ppm (GLITTER isotope columns) -> oxide wt%. Column names become oxides."""
-    out = {}
-    for iso, ox in OXIDE_FROM_ISOTOPE.items():
-        if iso in df:
-            f = OXIDE_MW[ox] / (_CATIONS_PER_OXIDE.get(ox, 1) * _ATOMIC_MW[ox])
-            out[ox] = df[iso] * f / 1e4
-    return pd.DataFrame(out, index=df.index)
-
-def load_ref_la(path, sheet="Trace elements LA sorted"):
-    """The 'Trace elements LA sorted' sheet -> reference values in ppm, elements as rows,
-    reference materials as columns. Uncertainty rows are skipped; names are shortened to
-    match the analysis labels in the GLITTER export (KL2-G -> KL2, BM90/21-G -> BM90)."""
-    raw = pd.read_excel(path, sheet, header=None)
-    els = [str(v) for v in raw.iloc[0, 1:42]]
-    rename = {"ATHO-G": "ATHO", "BM90/21-G": "BM90", "GOR128-G": "GOR128",
-              "GOR132-G": "GOR132", "KL2-G": "KL2", "ML3B-G": "ML3B",
-              "StHs6/80-G": "StHs6", "T1-G": "T1", "BCR2-G": "BCR2G"}
-    cols = {}
-    for i, name in enumerate(raw[0]):
-        if str(name).strip() in rename:
-            cols[rename[str(name).strip()]] = pd.to_numeric(raw.iloc[i, 1:42], errors="coerce").values
-    return pd.DataFrame(cols, index=els)
+# Sun & McDonough (1989), Geol. Soc. Spec. Publ. 42, 313-345: CI chondrite and primitive mantle, ppm
+# (values as compiled in pyrolite, Williams et al. 2020, files CH_SunMcDonough1989 / PM_SunMcDonough1989)
+CI_SM89 = {"La": 0.237, "Ce": 0.612, "Pr": 0.095, "Nd": 0.467, "Sm": 0.153, "Eu": 0.058, "Gd": 0.2055, "Tb": 0.0374,
+           "Dy": 0.254, "Ho": 0.0566, "Er": 0.1655, "Tm": 0.0255, "Yb": 0.17, "Lu": 0.0254}
+PM_SM89 = {"Cs": 0.032, "Rb": 0.635, "Ba": 6.989, "Th": 0.085, "U": 0.021, "Nb": 0.713, "Ta": 0.041, "K": 250,
+           "La": 0.687, "Ce": 1.775, "Pb": 0.185, "Pr": 0.276, "Sr": 21.1, "P": 95, "Nd": 1.354, "Zr": 11.2, "Hf": 0.309,
+           "Sm": 0.444, "Eu": 0.168, "Ti": 1300, "Gd": 0.596, "Tb": 0.108, "Dy": 0.737, "Y": 4.55, "Ho": 0.164,
+           "Er": 0.48, "Tm": 0.074, "Yb": 0.493, "Lu": 0.074, "Li": 1.6}
