@@ -1,4 +1,4 @@
-Olivine and Glass (Here for olivine but it should be similar for glass)
+Olivine (Correct)
 
 1) Copy the content of ol_01032017_oxide.txt and ol_01032017_ratios.txt into a single file.
 2) Rearrange columns if needed (Ex. Comment column to the beginning and then SiO2)
@@ -11,12 +11,29 @@ Olivine and Glass (Here for olivine but it should be similar for glass)
 9) Next we can now create a clean copy of the corrected values and discard the standards, it is also worth to flag any sample that has less than 98% or more than 102% total, if it is more we have a problem and should be reported, if it is less it may be admisible because we might have lost volatiles in the sample. Also this is the time to flag any anomalous measurement that might be erroneous and can be skipped for the figures (it will depend on the variability of the data, the values flagged must be obviously erroneous) (it needs to be reported in the data quality section though)(notice that an explanation is not necesary, since we don't know the conditions and is not part of the exercise)(it might also be helpful to report the detection limit to explain why some relative precisions are large for some elements).
 10) Done all values corrected and ready for plots.
 
+Glass (Pending to check)
+ 
+1) For the glass the same methodology as the olivine has to be used with some remarks on the standards. Here we have to ignore all the other standards except for Std VG2 ( this is arbitrary decision we just have to make sure that the standard contains all elements needed for correction, should be reported). The order we chose for the accuracy estimation is train split No.[3,4,57,100] and for the test split N0.[56, 101].
+2) All the other steps are exactly the same as the olivine part.
 
-ICPMS Inclusions
+
+ICPMS Inclusions (Pending to check)
 1) The data 170919s_9_global_tephra 1_Froukje2.csv is counterintuitive so the first step is to transpose the data and the samples also all the standards needed are in Standards.xlsx. 
-2) The file has already classified values below detection limit (MDL filtered) so we have to decide to either discard those values or keep them as they are (I would keep them to see what happens, therefore we use GLITTER!: Trace Element Concentrations, Not filtered for MDL.)
-3) The structure of the standards is 2 standards (KL2 for calibration) and 4 standards (KL2 and others for accuracy). As before, first we take out outliers that are biasing the mean of the standards. In this case the standards will decay over time so we will want to calculate the average of the standards by batches and then calculate the trendline to correct for the decay (notice that we still have the KL2 standards to estimate accuracy).
-4) Now with the fitted line we can now detrend all the samples over time (assume that the time intervals are consistent).
-5) After the correction we can now report the Average (KL2 or the name of the standard), Deviation from standard, StdDEV, StdDev in %, 2RSD, 2rSD% (for all standard types BCR2G, StHs6/80-G, ..., etc) worth having the .xlsx as reference and for the report 
-5) Now we might want to exclude the values BDL or also some other problematic values if needed (outliers biasing the mean) (either way it must be reported)
-6) Finally to plot the data we might need to normalize it to any chondrite/primitive mantle database available (recommend the best approach) so we get rid of the spikes. Also if some elements have too much range it sholud be reported (Ex. probable lead contamination).
+2) The file has already classified values below detection limit (MDL filtered), we are using these first. In this case the correction factor will decay over time so we will want to calculate the trendline to correct for the decay. We didn't take out any outliers so we use the standards as they are. The structure of the file is:
+
+	- Ignore all N612 measurements (machine calibration should not be taken as time stamps so initial time will be 004KL2 at time 1 (we skipped time 0).
+	- In this case we did 2 splits for correction (train) and for accuracy (test) and one measurement was discarded (004KL2). The splits are train split ###KL2 [005, 024, 025, 042, 044, 045, 064, 065, 066, 081, 082] and 	test split ###KL2 [006, 0026, 067, 083].
+
+3) The steps done for the train split were: Using the standards attached in standard_icpms.csv we took the train split we calculated the correction factor (measured/truth) per measurement in each column (better if you traspose the columns for readibility). Then we calculate the slope and intercept of the plot: the y-axis are the correction factors for each element and the x-axis are the time stamps per measurement (notice that we started with 005KL2 at time 2).
+4) Now we correct all the data (even the test split) using the GLITTER!: Trace Element Concentrations, Not filtered for MDL section with the formula: (original measurement)*[(correction factor slope*time stamp)+interception]
+5) Now with the corrected data we can calculate Average, STDev, 2STDev, RSTD (2STDev/Average), Accuracy (using both train and the test split) for KL2. Here we also want the same statistics for the other standards: BM90, GOR132, GOR128, BCR2G. 
+6) Now we might want to exclude the values BDL or also some other problematic values if needed (outliers biasing the mean) (either way it must be reported)
+7) Finally to plot the data we might need to normalize it to any chondrite/primitive mantle database available (recommend the best approach) so we get rid of the spikes. Also if some elements have too much range it sholud be reported (Ex. probable lead contamination).
+
+
+
+
+
+
+
+
