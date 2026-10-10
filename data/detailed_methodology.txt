@@ -1,4 +1,4 @@
-Olivine (Correct)
+Section 1: Olivine (Correct)
 
 1) Copy the content of ol_01032017_oxide.txt and ol_01032017_ratios.txt into a single file.
 2) Rearrange columns if needed (Ex. Comment column to the beginning and then SiO2)
@@ -11,13 +11,15 @@ Olivine (Correct)
 9) Next we can now create a clean copy of the corrected values and discard the standards, it is also worth to flag any sample that has less than 98% or more than 102% total, if it is more we have a problem and should be reported, if it is less it may be admisible because we might have lost volatiles in the sample. Also this is the time to flag any anomalous measurement that might be erroneous and can be skipped for the figures (it will depend on the variability of the data, the values flagged must be obviously erroneous) (it needs to be reported in the data quality section though)(notice that an explanation is not necesary, since we don't know the conditions and is not part of the exercise)(it might also be helpful to report the detection limit to explain why some relative precisions are large for some elements).
 10) Done all values corrected and ready for plots.
 
-Glass (Pending to check)
+Section 2: Glass (Correct)
  
 1) For the glass the same methodology as the olivine has to be used with some remarks on the standards. Here we have to ignore all the other standards except for Std VG2 ( this is arbitrary decision we just have to make sure that the standard contains all elements needed for correction, should be reported). The order we chose for the accuracy estimation is train split No.[3,4,57,100] and for the test split N0.[56, 101].
 2) All the other steps are exactly the same as the olivine part.
 
 
-ICPMS Inclusions (Pending to check)
+
+Section 3: ICPMS Inclusions (Pending to check)
+
 1) The data 170919s_9_global_tephra 1_Froukje2.csv is counterintuitive so the first step is to transpose the data and the samples also all the standards needed are in Standards.xlsx. 
 2) The file has already classified values below detection limit (MDL filtered), we are using these first. In this case the correction factor will decay over time so we will want to calculate the trendline to correct for the decay. We didn't take out any outliers so we use the standards as they are. The structure of the file is:
 
