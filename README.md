@@ -37,7 +37,7 @@ Start Jupyter in the repository root. Every path is relative to the root and set
 
 Notebooks 01 to 03 are independent of each other.
 
-The report compiles from the repository root, so that the figure paths resolve: `pdflatex report.tex` (run twice for the references). The appendix tables in `report.tex` are the tables of `outputs/paper_tables.xlsx`.
+The report compiles from the repository root, so that the figure paths resolve: `pdflatex report.tex` (run twice for the references). The appendix tables in `report.tex` (A1 to A4) are the tables of `outputs/tables_appendix.xlsx`.
 
 ## Input data
 
@@ -84,21 +84,21 @@ The report compiles from the repository root, so that the figure paths resolve: 
 4. Correct every analysis, using the concentrations not filtered for MDL: corrected = original / (slope × time + intercept).
 5. For KL2 (train, test and both) and BM90/21-G, GOR132-G, GOR128-G and BCR-2G: average, STDev, 2STDev, RSTD = 2STDev / average, and accuracy. Ca43 is listed for completeness; as the internal standard it is fixed in GLITTER, so it is left out of the medians.
 6. Exclude BDL values and BCR-2G run 70 (normalised to the wrong Ca). Flag an element when its RSTD on KL2 exceeds 20 % or its accuracy on BCR-2G is worse than ±15 %.
-7. Normalise the REE to CI chondrite and the multi-element pattern to primitive mantle (Sun & McDonough, 1989). Flag inclusions with Pb/Pb* above 5 as probable Pb contamination.
+7. Normalise the REE to CI chondrite and the multi-element pattern to primitive mantle (Sun & McDonough, 1989). Report elements with too much range: Pb (2.6 to 1858 µg/g) falls into two groups, 38 analyses up to 22 µg/g and 9 from 56 µg/g, with nothing in between; the 9 are flagged as probable Pb contamination.
 
 ### Figures and tables: 04
 
-Five report figures in `figures/report/` (300 dpi):
+Five report figures in `figures/report/` (300 dpi), drawn at their printed size, the full text width of the report (`TW` = 6.85 in):
 
 1. `fig1_methodology_examples.png`: a standard with its removed outlier in each EPMA session, the KL2 boron correction factor against time with its fitted line, and the EPMA totals.
 2. `fig2_data_quality.png`: EPMA correction factors per oxide (±5 % band), EPMA precision against hold-out accuracy, and LA-ICP-MS reportability (KL2 precision against BCR-2G accuracy).
-3. `fig3_glass_harker.png`: glass Harker diagrams against MgO (spots, and sample means ± 2SD).
+3. `fig3_glass_harker.png`: glass Harker diagrams against MgO (spots, and sample means ± 2SD coloured by sample family; three colours at most, the validated limit for a scatter, and a shape per sample).
 4. `fig4_olivine.png`: olivine NiO, MnO and CaO against Fo, with the Fo in equilibrium with the C21 glass.
 5. `fig5_melt_inclusions.png`: CI-normalised REE and primitive-mantle-normalised multi-element patterns per suite.
 
 Host-olivine check: the LA-ICP-MS major elements of each inclusion analysis are converted to oxides and summed (67 to 416 wt%). The sum follows Si, Mg, Fe and Mn (r = 0.96 to 0.99) and partly Sc (0.69) and Li (0.39), so the laser also ablated host olivine. Elements with r > 0.5 (Si, Mg, Fe, Mn, Sc) are marked h in the inclusion table and not interpreted; all other elements have |r| ≤ 0.27.
 
-`paper_tables.xlsx` has one sheet per dataset with n and mean ± 2SD. The EPMA standards are given as uncorrected mean, reference value, correction factor, precision and hold-out accuracy. The LA-ICP-MS standards are BCR-2G and the KL2 test split with their accuracy, plus the KL2 precision. Footnotes are generated from the outputs of 01 to 03.
+`tables_appendix.xlsx` has one sheet per table. Glass, olivine and melt inclusions: n and mean ± 2SD. The EPMA standards are given as uncorrected mean, reference value, correction factor, precision and hold-out accuracy; the melt inclusion table carries BCR-2G and the KL2 test split with their accuracy, plus the KL2 precision. The sheet *LA-ICP-MS standards* gives accuracy and RSTD per element for every standard measured as an unknown (KL2-G, BCR-2G, GOR132-G, GOR128-G, BM90/21-G). Footnotes are generated from the outputs of 01 to 03.
 
 ## Outputs
 
@@ -110,7 +110,7 @@ Host-olivine check: the LA-ICP-MS major elements of each inclusion analysis are 
 | `outputs/glass_final.xlsx` | corrected samples with flags, sample means, standard QC, hold-out accuracy, detection limits |
 | `outputs/laicpms_standards_QC.xlsx` | statistics per standard (KL2 train, test and both; BCR-2G, GOR132-G, GOR128-G, BM90/21-G), element flags, KL2 fit |
 | `outputs/laicpms_final.xlsx` | corrected analyses with flags, inclusion means, element flags, run list with time stamps and splits |
-| `outputs/paper_tables.xlsx` | glass, olivine and melt inclusion tables formatted for a paper |
+| `outputs/tables_appendix.xlsx` | Tables A1 to A4 of the report: glass, olivine, melt inclusions and LA-ICP-MS standards |
 
 ## Conventions
 
@@ -132,7 +132,7 @@ Every judgement call is a short, commented variable in the notebook that applies
 | Hold-out split for accuracy | `PER_BRACKET` (01); `TRAIN`, `TEST` (02, 03) |
 | KL2 analysis discarded | `DISCARD` (03, config) |
 | Element reportability thresholds | 03, step 6 |
-| Pb contamination threshold | 03, step 7 |
+| Pb contamination cut (in the gap between the two Pb groups) | `PB_MAX` (03, step 7) |
 | Kd and Fe²⁺/ΣFe for the olivine-melt equilibrium band | `KD`, `FE2` (04, config) |
 | Elements marked as host olivine in the inclusions (r > 0.5 with the oxide sum) | `HOST` (04, host-olivine check) |
 
